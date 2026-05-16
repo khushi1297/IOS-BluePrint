@@ -16,6 +16,7 @@ enum AppStep: CaseIterable, Hashable {
 
 struct ContentView: View {
     @State private var currentStep: AppStep = .landing
+    @StateObject private var blueprint = BlueprintState()
 
     var body: some View {
         GeometryReader { geo in
@@ -40,16 +41,16 @@ struct ContentView: View {
                                 )
                             )
                     case .canvas:
-                        CanvasView(currentStep: $currentStep)
+                        CanvasView(currentStep: $currentStep, blueprint: blueprint)
                             .transition(.opacity)
                     case .gap:
-                        GapView(currentStep: $currentStep)
+                        GapView(currentStep: $currentStep, blueprint: blueprint)
                             .transition(.move(edge: .trailing))
                     case .tasks:
-                        TasksView(currentStep: $currentStep)
+                        TasksView(currentStep: $currentStep, blueprint: blueprint)
                             .transition(.move(edge: .trailing))
                     case .tinyWin:
-                        TinyWinView(currentStep: $currentStep)
+                        TinyWinView(currentStep: $currentStep, blueprint: blueprint)
                             .transition(.move(edge: .trailing).combined(with: .opacity))
                     case .gentleReflection:
                         GentleReflectionView(currentStep: $currentStep)

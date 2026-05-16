@@ -1,43 +1,44 @@
 import SwiftUI
 
 private enum TasksPalette {
-    static let canvas = Color(red: 0.98, green: 0.96, blue: 0.95)
-    static let titleYellow = Color(hue: 0.12, saturation: 0.55, brightness: 0.95)
-    static let cardOpen = Color(red: 1.0, green: 0.55, blue: 0.52)
-    static let cardLocked = Color(red: 0.94, green: 0.92, blue: 0.88)
-}
-
-private struct TodayTask: Identifiable, Equatable {
-    let id = UUID()
-    var title: String
-    var subtitle: String
-    var isCompleted: Bool
+    static let canvas = Color(red: 0.99, green: 0.98, blue: 0.97)
+    static let titleYellow = Color(red: 1.0, green: 0.74, blue: 0.17)
 }
 
 struct TasksView: View {
     @Binding var currentStep: AppStep
+    @ObservedObject var blueprint: BlueprintState
 
-    /// First three tasks must all be completed before any task at index ≥ 3 unlocks (“keep 3 open” gate).
-    private let openGroupSize = 3
+    @State private var pageContent: TaskPageContent?
+    @State private var generationKey: String = ""
+    @State private var showMoodOverlay = false
+    @State private var pendingMood: CanvasMood?
 
-    @State private var moodLabel: String = "Rough"
-    @State private var moodEmoji: String = "😣"
+    private var mood: CanvasMood? { blueprint.selectedMood }
+    private var cardFill: Color { mood?.tasksCardFill ?? Color(red: 1.0, green: 0.36, blue: 0.40) }
+    private var ctaTint: Color { mood?.tasksChipBackground ?? Color(red: 1.0, green: 0.82, blue: 0.84) }
 
-    @State private var tasks: [TodayTask] = [
-        TodayTask(title: "Reply to 1 important email", subtitle: "Instead of clearing your inbox", isCompleted: false),
-        TodayTask(title: "Walk for 10 minutes", subtitle: "A lighter version of workout", isCompleted: false),
-        TodayTask(title: "Review portfolio", subtitle: "Deep-research work session", isCompleted: false),
-        TodayTask(title: "Book the Perth trip", subtitle: "View the website that have cheaper tickets", isCompleted: false),
-        TodayTask(title: "Work on big goal (2hrs)", subtitle: "Saved for better energy days", isCompleted: false),
-    ]
+    private var isFlowComplete: Bool { blueprint.isReadyForTasks }
 
-    private var firstOpenGroupComplete: Bool {
-        guard tasks.count >= openGroupSize else { return tasks.allSatisfy(\.isCompleted) }
-        return tasks.prefix(openGroupSize).allSatisfy(\.isCompleted)
+    private var supportiveSentence: String {
+        mood?.tasksTagline ?? pageContent?.supportiveSentence ?? "Be kind to yourself today"
     }
 
-    private func isLocked(index: Int) -> Bool {
-        index >= openGroupSize && !firstOpenGroupComplete
+    private var helperText: String {
+        mood?.tasksHelperText ?? pageContent?.helperText ?? "Check off the task as you go"
+    }
+
+    private var ctaTitle: String {
+        mood?.tasksCTATitle ?? pageContent?.ctaTitle ?? "Continue"
+    }
+
+    private var canProceed: Bool {
+        guard let pageContent else { return false }
+        let tasksDone = pageContent.canProceed(completedIDs: blueprint.completedTaskIDs)
+        if pageContent.mood == .rough {
+            return tasksDone
+        }
+        return isFlowComplete && tasksDone
     }
 
     var body: some View {
@@ -49,23 +50,40 @@ struct TasksView: View {
                 header
                     .padding(.horizontal, 24)
                     .padding(.top, 12)
-                    .padding(.bottom, 8)
+                    .padding(.bottom, 12)
 
                 ScrollView {
                     VStack(spacing: 14) {
-                        ForEach(Array(tasks.enumerated()), id: \.element.id) { index, task in
-                            let locked = isLocked(index: index)
-                            TodayTaskRow(
-                                task: task,
-                                locked: locked,
-                                accent: TasksPalette.cardOpen
-                            ) {
-                                toggleTask(id: task.id, locked: locked)
+                        if !isFlowComplete, mood != .rough {
+                            flowSetupBanner
+                        }
+
+                        if let pageContent {
+                            if pageContent.mood.tasksShowsContextChips, isFlowComplete {
+                                contextChips(pageContent)
                             }
+
+                            ForEach(pageContent.tasks) { task in
+                                let locked = pageContent.isLocked(task, completedIDs: blueprint.completedTaskIDs)
+                                TodayTaskRow(
+                                    task: task,
+                                    displaySubtitle: pageContent.displaySubtitle(
+                                        for: task,
+                                        completedIDs: blueprint.completedTaskIDs
+                                    ),
+                                    locked: locked,
+                                    isCompleted: blueprint.isTaskCompleted(task.id),
+                                    cardFill: cardFill
+                                ) {
+                                    toggleTask(task, locked: locked)
+                                }
+                            }
+                        } else if mood == nil {
+                            setMoodBanner
                         }
                     }
                     .padding(.horizontal, 24)
-                    .padding(.top, 8)
+                    .padding(.top, 4)
                     .padding(.bottom, 24)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -73,67 +91,193 @@ struct TasksView: View {
                 footerChrome
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+
+            if showMoodOverlay {
+                MoodCheckInOverlay(
+                    pendingMood: $pendingMood,
+                    onClose: {
+                        withAnimation(.spring(response: 0.45, dampingFraction: 0.88)) {
+                            showMoodOverlay = false
+                            pendingMood = nil
+                        }
+                    },
+                    onContinue: {
+                        guard let newMood = pendingMood else { return }
+                        withAnimation(.spring(response: 0.45, dampingFraction: 0.88)) {
+                            blueprint.selectedMood = newMood
+                            blueprint.completedTaskIDs.removeAll()
+                            showMoodOverlay = false
+                            pendingMood = nil
+                            refreshPageContent(force: true)
+                        }
+                    }
+                )
+                .transition(.opacity.combined(with: .scale(scale: 0.96, anchor: .center)))
+                .zIndex(50_000)
+            }
         }
+        .onAppear { refreshPageContent(force: false) }
+        .onChange(of: blueprint.selectedMood) { _, _ in refreshPageContent(force: true) }
+        .onChange(of: blueprint.selectedLifeArea) { _, _ in refreshPageContent(force: true) }
+        .onChange(of: blueprint.selectedGap) { _, _ in refreshPageContent(force: true) }
     }
 
+    // MARK: - Header
+
     private var header: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .top) {
-                Text("Today's task")
-                    .font(.system(size: 32, weight: .bold, design: .rounded))
-                    .foregroundStyle(TasksPalette.titleYellow)
+        VStack(spacing: 14) {
+            Text("Today's task")
+                .font(.system(size: 34, weight: .black, design: .rounded))
+                .foregroundStyle(TasksPalette.titleYellow)
+                .frame(maxWidth: .infinity, alignment: .center)
 
-                Spacer(minLength: 8)
-
+            HStack(alignment: .center, spacing: 8) {
+                moodChip
+                Spacer(minLength: 4)
                 Button {
-                    // Placeholder — hook mood sheet later
+                    pendingMood = blueprint.selectedMood
+                    withAnimation(.spring(response: 0.5, dampingFraction: 0.86)) {
+                        showMoodOverlay = true
+                    }
                 } label: {
                     Text("Change mood ›")
-                        .font(.system(size: 13, weight: .medium, design: .rounded))
-                        .foregroundStyle(.secondary)
+                        .font(.system(size: 14, weight: .medium, design: .rounded))
+                        .foregroundStyle(Color(white: 0.45))
                 }
                 .buttonStyle(.plain)
             }
+            .padding(.trailing, mood == .rough ? 44 : 8)
 
+            Text(supportiveSentence)
+                .font(.system(size: 15, weight: .regular, design: .rounded))
+                .foregroundStyle(Color(white: 0.32))
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: .infinity)
+        }
+    }
+
+    @ViewBuilder
+    private var moodChip: some View {
+        if let mood {
             HStack(spacing: 8) {
-                HStack(spacing: 6) {
-                    Text(moodEmoji)
-                        .font(.system(size: 16))
-                    Text(moodLabel)
-                        .font(.system(size: 13, weight: .semibold, design: .rounded))
-                        .foregroundStyle(.black.opacity(0.65))
-                }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
-                .background(Color(red: 1.0, green: 0.88, blue: 0.9).opacity(0.95))
-                .clipShape(Capsule())
+                Text(mood.emoji)
+                    .font(.system(size: 15))
+                    .frame(width: 22, height: 22)
+                    .background(
+                        RoundedRectangle(cornerRadius: 5, style: .continuous)
+                            .fill(mood == .rough ? Color(red: 0.95, green: 0.55, blue: 0.58) : mood.tasksChipBackground)
+                    )
 
-                Spacer()
+                Text(mood.title)
+                    .font(.system(size: 14, weight: .bold, design: .rounded))
+                    .foregroundStyle(
+                        (mood == .rough || mood == .good)
+                            ? Color.black.opacity(0.88)
+                            : mood.tasksChipLabelColor
+                    )
             }
-
-            Text(moodTagline)
-                .font(.system(size: 14, weight: .regular, design: .rounded))
+            .padding(.horizontal, 14)
+            .padding(.vertical, 8)
+            .background(mood.tasksChipBackground)
+            .clipShape(Capsule())
+        } else {
+            Text("Set mood")
+                .font(.system(size: 14, weight: .semibold, design: .rounded))
                 .foregroundStyle(.secondary)
-                .italic()
+                .padding(.horizontal, 14)
+                .padding(.vertical, 8)
+                .background(Color(red: 1.0, green: 0.82, blue: 0.84))
+                .clipShape(Capsule())
         }
     }
 
-    private var moodTagline: String {
-        switch moodLabel {
-        case "Rough": return "Rough days count too. Be easy on yourself."
-        case "Low": return "Small steps still move you forward."
-        case "Normal": return "Steady is enough today."
-        case "Good": return "You’ve got room to stretch a little."
-        default: return "Be kind to yourself today."
+    private func contextChips(_ content: TaskPageContent) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            chipLabel(content.lifeArea.title)
+            chipLabel(content.gap.listTitle)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
+
+    private func chipLabel(_ text: String) -> some View {
+        Text(text)
+            .font(.system(size: 12, weight: .semibold, design: .rounded))
+            .foregroundStyle(Color(white: 0.35))
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+            .background(Color.white.opacity(0.85))
+            .clipShape(Capsule())
+            .overlay(
+                Capsule()
+                    .strokeBorder(Color.black.opacity(0.06), lineWidth: 0.5)
+            )
+    }
+
+    private var flowSetupBanner: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Personalize your list")
+                .font(.system(size: 14, weight: .bold, design: .rounded))
+                .foregroundStyle(Color(white: 0.28))
+
+            Text("Pick a life area on Canvas and a blocker on Gap — your micro-actions will update.")
+                .font(.system(size: 13, weight: .regular, design: .rounded))
+                .foregroundStyle(Color(white: 0.4))
+                .fixedSize(horizontal: false, vertical: true)
+
+            HStack(spacing: 10) {
+                if blueprint.selectedLifeArea == nil {
+                    Button {
+                        withAnimation { currentStep = .canvas }
+                    } label: {
+                        Text("Go to Canvas")
+                            .font(.system(size: 12, weight: .semibold, design: .rounded))
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 8)
+                            .background(Color(red: 1.0, green: 0.82, blue: 0.84))
+                            .clipShape(Capsule())
+                    }
+                    .buttonStyle(.plain)
+                }
+
+                if blueprint.selectedGap == nil {
+                    Button {
+                        withAnimation { currentStep = .gap }
+                    } label: {
+                        Text("Go to Gap")
+                            .font(.system(size: 12, weight: .semibold, design: .rounded))
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 8)
+                            .background(Color(red: 1.0, green: 0.82, blue: 0.84))
+                            .clipShape(Capsule())
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.white.opacity(0.92))
+        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .shadow(color: .black.opacity(0.04), radius: 8, y: 2)
+    }
+
+    private var setMoodBanner: some View {
+        Text("Check in on Canvas to set how you're feeling today.")
+            .font(.system(size: 13, weight: .medium, design: .rounded))
+            .foregroundStyle(Color(white: 0.4))
+            .padding(12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color.white.opacity(0.7))
+            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+    }
+
+    // MARK: - Footer
 
     private var footerChrome: some View {
         VStack(spacing: 12) {
-            Text("Check off the task as you go.")
+            Text(helperText)
                 .font(.system(size: 13, weight: .regular, design: .rounded))
-                .foregroundStyle(.secondary)
-                .italic()
+                .foregroundStyle(Color(white: 0.5))
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: .infinity)
                 .padding(.horizontal, 24)
@@ -141,9 +285,13 @@ struct TasksView: View {
             Button {
                 withAnimation { currentStep = .tinyWin }
             } label: {
-                Text("Continue")
+                Text(ctaTitle)
+                    .font(BlueprintPrimaryButton.titleFont)
+                    .foregroundStyle(Color.black.opacity(canProceed ? 0.82 : 0.38))
             }
-            .buttonStyle(BlueprintPrimaryCapsuleButtonStyle())
+            .buttonStyle(LiquidGlassCapsuleButtonStyle(tint: ctaTint))
+            .disabled(!canProceed)
+            .opacity(canProceed ? 1 : 0.5)
             .padding(.horizontal, 48)
 
             BlueprintBottomNavBar(currentStep: $currentStep)
@@ -152,85 +300,139 @@ struct TasksView: View {
         .padding(.bottom, 28)
     }
 
-    private func toggleTask(id: UUID, locked: Bool) {
+    // MARK: - Data
+
+    private func refreshPageContent(force: Bool) {
+        guard let mood = blueprint.selectedMood else {
+            pageContent = nil
+            generationKey = ""
+            return
+        }
+
+        let lifeArea = blueprint.selectedLifeArea ?? .freedomFlexibility
+        let gap = blueprint.selectedGap ?? .burnout
+        let key = blueprint.taskGenerationKey
+            ?? "preview|\(mood.rawValue)|\(lifeArea.rawValue)|\(gap.rawValue)"
+
+        if !force, key == generationKey, pageContent != nil { return }
+        generationKey = key
+
+        let content = DailyTaskGenerator.makePageContent(
+            mood: mood,
+            lifeArea: lifeArea,
+            gap: gap,
+            generationKey: key
+        )
+
+        withAnimation(.easeInOut(duration: 0.25)) {
+            pageContent = content
+        }
+
+        let validIDs = Set(content.tasks.map(\.id))
+        blueprint.completedTaskIDs = blueprint.completedTaskIDs.intersection(validIDs)
+    }
+
+    private func toggleTask(_ task: DailyTask, locked: Bool) {
         guard !locked else { return }
-        guard let i = tasks.firstIndex(where: { $0.id == id }) else { return }
         withAnimation(.spring(response: 0.42, dampingFraction: 0.84)) {
-            tasks[i].isCompleted.toggle()
+            blueprint.toggleTaskCompleted(task.id)
         }
     }
 }
 
+// MARK: - Task row
+
 private struct TodayTaskRow: View {
-    let task: TodayTask
+    let task: DailyTask
+    let displaySubtitle: String
     let locked: Bool
-    let accent: Color
+    let isCompleted: Bool
+    let cardFill: Color
     let onToggle: () -> Void
 
     var body: some View {
         HStack(alignment: .center, spacing: 14) {
+            leadingIcon
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(task.title)
+                    .font(.system(size: 17, weight: .bold, design: .rounded))
+                    .foregroundStyle(.black.opacity(locked ? 0.82 : 0.9))
+                    .strikethrough(isCompleted && !locked, color: .black.opacity(0.35))
+                    .multilineTextAlignment(.leading)
+
+                Text(displaySubtitle)
+                    .font(.system(size: 13, weight: .regular, design: .rounded))
+                    .foregroundStyle(.black.opacity(locked ? 0.48 : 0.55))
+                    .strikethrough(isCompleted && !locked, color: .black.opacity(0.3))
+                    .multilineTextAlignment(.leading)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            if !locked {
+                Image(systemName: "pencil")
+                    .font(.system(size: 18, weight: .regular))
+                    .foregroundStyle(.black.opacity(isCompleted ? 0.25 : 0.55))
+                    .frame(width: 28)
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 16)
+        .background(cardFill)
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .opacity(isCompleted && !locked ? 0.62 : 1)
+        .animation(.easeInOut(duration: 0.22), value: isCompleted)
+    }
+
+    @ViewBuilder
+    private var leadingIcon: some View {
+        if locked {
+            ZStack {
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .strokeBorder(Color.black.opacity(0.35), lineWidth: 2)
+                    .frame(width: 32, height: 32)
+                Image(systemName: "lock.fill")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(.black.opacity(0.45))
+            }
+            .frame(width: 32)
+        } else {
             Button(action: onToggle) {
                 ZStack {
                     RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .strokeBorder(Color.black.opacity(locked ? 0.12 : 0.35), lineWidth: 2)
-                        .frame(width: 28, height: 28)
+                        .fill(Color.white.opacity(isCompleted ? 0 : 0.92))
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .strokeBorder(Color.black.opacity(0.35), lineWidth: 2)
+                        .frame(width: 32, height: 32)
                         .background(
                             RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                .fill(task.isCompleted ? Color.black.opacity(0.55) : Color.clear)
+                                .fill(isCompleted ? Color.black.opacity(0.55) : Color.clear)
                         )
 
-                    if task.isCompleted {
+                    if isCompleted {
                         Image(systemName: "checkmark")
-                            .font(.system(size: 14, weight: .bold))
+                            .font(.system(size: 15, weight: .bold))
                             .foregroundStyle(.white)
                     }
                 }
             }
             .buttonStyle(.plain)
-            .disabled(locked)
-
-            VStack(alignment: .leading, spacing: 4) {
-                Text(task.title)
-                    .font(.system(size: 16, weight: .bold, design: .rounded))
-                    .foregroundStyle(.black.opacity(locked ? 0.35 : 0.88))
-                    .strikethrough(task.isCompleted, color: .black.opacity(0.35))
-                    .multilineTextAlignment(.leading)
-
-                Text(task.subtitle)
-                    .font(.system(size: 12, weight: .regular, design: .rounded))
-                    .foregroundStyle(locked ? Color.black.opacity(0.28) : Color.black.opacity(0.55))
-                    .strikethrough(task.isCompleted, color: .black.opacity(0.3))
-                    .multilineTextAlignment(.leading)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-
-            Group {
-                if locked {
-                    Image(systemName: "lock.fill")
-                        .font(.system(size: 18, weight: .semibold))
-                        .foregroundStyle(.black.opacity(0.35))
-                } else {
-                    Image(systemName: "pencil")
-                        .font(.system(size: 18, weight: .semibold))
-                        .foregroundStyle(.black.opacity(task.isCompleted ? 0.25 : 0.55))
-                }
-            }
-            .frame(width: 28)
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 14)
-        .background(rowBackground)
-        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .opacity(task.isCompleted ? 0.58 : 1)
-        .animation(.easeInOut(duration: 0.22), value: task.isCompleted)
-    }
-
-    private var rowBackground: Color {
-        if locked { return TasksPalette.cardLocked }
-        return accent.opacity(0.92)
     }
 }
 
-#Preview {
-    TasksView(currentStep: .constant(.tasks))
+#Preview("Rough") {
+    let blueprint = BlueprintState()
+    blueprint.selectedMood = .rough
+    blueprint.selectedLifeArea = .freedomFlexibility
+    blueprint.selectedGap = .burnout
+    return TasksView(currentStep: .constant(.tasks), blueprint: blueprint)
+}
+
+#Preview("Good") {
+    let blueprint = BlueprintState()
+    blueprint.selectedMood = .good
+    blueprint.selectedLifeArea = .growthLearning
+    blueprint.selectedGap = .lowConsistency
+    return TasksView(currentStep: .constant(.tasks), blueprint: blueprint)
 }

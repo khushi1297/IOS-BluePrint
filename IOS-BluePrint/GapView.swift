@@ -23,31 +23,24 @@ private extension Color {
     static let gapTabBarFill = Color(hex: 0x3A3A3A).opacity(0.92)
 }
 
-struct BlockingItem: Identifiable {
-    let id = UUID()
-    let text: String
-}
-
 struct GapView: View {
     @Binding var currentStep: AppStep
-
-    /// Shown in the header life-area chip (wire from flow later).
-    var selectedLifeArea: String = "Freedom & Flexibility"
-    /// Shown in the mood chip (wire from flow later).
-    var selectedMood: String = "Rough"
-    /// Emoji prefix for mood chip; swap per mood if needed.
-    var moodEmoji: String = "😤"
+    @ObservedObject var blueprint: BlueprintState
 
     @State private var puzzleVisible: [Bool] = Array(repeating: false, count: 16)
     @State private var blockingVisible: [Bool] = Array(repeating: false, count: 5)
 
-    private let blockingItems: [BlockingItem] = [
-        BlockingItem(text: "1. Contract job with no paid leave, can't take time off"),
-        BlockingItem(text: "2. Daily burnout and lack of recovery time"),
-        BlockingItem(text: "3. Student debt repayments eating every spare dollar"),
-        BlockingItem(text: "4. Hard to stay consistent when I'm low"),
-        BlockingItem(text: "5. My environment doesn't support this yet"),
-    ]
+    private var lifeAreaLabel: String {
+        blueprint.selectedLifeArea?.title ?? "Pick a life area on Canvas"
+    }
+
+    private var moodLabel: String {
+        blueprint.selectedMood?.title ?? "Set mood"
+    }
+
+    private var moodEmoji: String {
+        blueprint.selectedMood?.emoji ?? "😐"
+    }
 
     var body: some View {
         ZStack(alignment: .bottom) {
@@ -105,7 +98,7 @@ struct GapView: View {
             }
             .buttonStyle(.plain)
 
-            chipPill(text: selectedLifeArea)
+            chipPill(text: lifeAreaLabel)
                 .lineLimit(1)
                 .layoutPriority(-1)
 
@@ -120,7 +113,7 @@ struct GapView: View {
         HStack(spacing: 6) {
             Text(moodEmoji)
                 .font(.system(size: 14))
-            Text(selectedMood)
+            Text(moodLabel)
                 .font(.system(size: 12, weight: .semibold, design: .rounded))
                 .foregroundStyle(Color.gapTextPrimary)
         }
@@ -252,25 +245,43 @@ struct GapView: View {
                 .font(.system(size: 15, weight: .medium, design: .rounded))
                 .foregroundStyle(Color.gapTextPrimary.opacity(0.85))
 
-            ForEach(Array(blockingItems.enumerated()), id: \.element.id) { index, item in
+            ForEach(Array(GapBlocker.allCases.enumerated()), id: \.element.id) { index, blocker in
                 let visible = index < blockingVisible.count ? blockingVisible[index] : false
+                let selected = blueprint.selectedGap == blocker
 
-                Text(item.text)
-                    .font(.system(size: 14, weight: .regular, design: .rounded))
-                    .foregroundStyle(Color.gapTextPrimary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        blueprint.selectedGap = blocker
+                    }
+                } label: {
+                    HStack(alignment: .top, spacing: 10) {
+                        Text("\(index + 1).")
+                            .font(.system(size: 14, weight: .semibold, design: .rounded))
+                            .foregroundStyle(Color.gapTextPrimary.opacity(0.7))
+
+                        Text(blocker.listTitle)
+                            .font(.system(size: 14, weight: selected ? .semibold : .regular, design: .rounded))
+                            .foregroundStyle(Color.gapTextPrimary)
+                            .multilineTextAlignment(.leading)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
                     .padding(.vertical, 12)
                     .padding(.horizontal, 14)
                     .background(
                         RoundedRectangle(cornerRadius: 8, style: .continuous)
-                            .fill(Color.gapPink.opacity(0.7))
+                            .fill(selected ? Color.gapPurple.opacity(0.55) : Color.gapPink.opacity(0.7))
                     )
                     .overlay(
                         RoundedRectangle(cornerRadius: 8, style: .continuous)
-                            .strokeBorder(Color.black.opacity(0.18), lineWidth: 0.35)
+                            .strokeBorder(
+                                selected ? Color.gapChipBorder : Color.black.opacity(0.18),
+                                lineWidth: selected ? 1.5 : 0.35
+                            )
                     )
-                    .opacity(visible ? 1 : 0)
-                    .offset(y: visible ? 0 : 16)
+                }
+                .buttonStyle(.plain)
+                .opacity(visible ? 1 : 0)
+                .offset(y: visible ? 0 : 16)
             }
         }
     }
@@ -285,7 +296,9 @@ struct GapView: View {
         } label: {
             Text("Continue")
         }
-        .buttonStyle(BlueprintPrimaryCapsuleButtonStyle())
+        .buttonStyle(BlueprintPrimaryCapsuleButtonStyle(isEnabled: blueprint.selectedGap != nil))
+        .disabled(blueprint.selectedGap == nil)
+        .opacity(blueprint.selectedGap == nil ? 0.5 : 1)
     }
 
     private var tabBar: some View {
@@ -355,5 +368,5 @@ struct GapView: View {
 }
 
 #Preview {
-    GapView(currentStep: .constant(.gap))
+    GapView(currentStep: .constant(.gap), blueprint: BlueprintState())
 }

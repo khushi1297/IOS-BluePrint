@@ -11,7 +11,8 @@ import SwiftUI
 struct IOS_BluePrintApp: App {
     var body: some Scene {
         WindowGroup {
-            EmotionEaseView()
+            ContentView()
         }
     }
 }
+ 

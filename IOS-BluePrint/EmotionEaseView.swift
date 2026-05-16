@@ -44,6 +44,8 @@ private func makeTiles() -> [MoodTile] {
 
 struct EmotionEaseView: View {
 
+    @Binding var currentStep: AppStep
+
     @State private var tiles: [MoodTile] = makeTiles()
 
     @State private var pendingTileID: UUID?
@@ -68,24 +70,29 @@ struct EmotionEaseView: View {
                 .ignoresSafeArea()
 
             VStack(spacing: 0) {
-                headerSection
-                    .padding(.top, 56)
-                    .padding(.horizontal, 24)
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 0) {
+                        headerSection
+                            .padding(.top, 8)
+                            .padding(.horizontal, 24)
 
-                progressStrip
-                    .padding(.top, 20)
-                    .padding(.horizontal, 24)
+                        progressStrip
+                            .padding(.top, 20)
+                            .padding(.horizontal, 24)
 
-                moodboardGrid
-                    .padding(.top, 20)
-                    .padding(.horizontal, 16)
-
-                Spacer(minLength: 16)
+                        moodboardGrid
+                            .padding(.top, 20)
+                            .padding(.horizontal, 16)
+                            .padding(.bottom, 16)
+                    }
+                }
 
                 continueBtn
                     .padding(.horizontal, 24)
-                    .padding(.bottom, 40)
+                    .padding(.top, 12)
+                    .padding(.bottom, 16)
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         }
         .photosPicker(
             isPresented: $showPhotoPicker,
@@ -114,7 +121,7 @@ struct EmotionEaseView: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("This is your space \u{1F33F}")
+                    Text("This is your space")
                         .font(.system(size: 26, weight: .bold, design: .rounded))
                         .foregroundStyle(Color(hue: 0.72, saturation: 0.5, brightness: 0.38))
 
@@ -288,7 +295,6 @@ struct EmotionEaseView: View {
                     )
             }
 
-            // Border ring
             RoundedRectangle(cornerRadius: 18)
                 .strokeBorder(.white.opacity(0.35), lineWidth: 1.5)
         }
@@ -299,7 +305,9 @@ struct EmotionEaseView: View {
     private var continueBtn: some View {
         Button {
             if canContinue {
-                didTapContinue = true
+                withAnimation {
+                    currentStep = .questions
+                }
             } else {
                 withAnimation(.spring(response: 0.3, dampingFraction: 0.4)) {
                     quoteShakeError = true
@@ -311,47 +319,15 @@ struct EmotionEaseView: View {
         } label: {
             HStack(spacing: 10) {
                 Text(canContinue ? "Continue" : "Add \(remaining) more to continue")
-                    .font(.system(size: 17, weight: .semibold, design: .rounded))
-                    .foregroundStyle(
-                        canContinue
-                            ? .white
-                            : Color(hue: 0.72, saturation: 0.4, brightness: 0.5)
-                    )
-
                 if canContinue {
                     Image(systemName: "arrow.right")
                         .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(.white)
                 }
             }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 17)
-            .background(
-                Group {
-                    if canContinue {
-                        LinearGradient(
-                            colors: [Color(hue: 0.72, saturation: 0.55, brightness: 0.72),
-                                     Color(hue: 0.58, saturation: 0.45, brightness: 0.78)],
-                            startPoint: .leading,
-                            endPoint: .trailing
-                        )
-                        .opacity(1)
-                    } else {
-                        Color(hue: 0.72, saturation: 0.12, brightness: 0.92)
-                            .opacity(1)
-                    }
-                }
-            )
-            .clipShape(RoundedRectangle(cornerRadius: 16))
-            .shadow(
-                color: canContinue
-                    ? Color(hue: 0.72, saturation: 0.5, brightness: 0.6).opacity(0.4)
-                    : .clear,
-                radius: 12, x: 0, y: 6
-            )
-            .offset(x: quoteShakeError ? -8 : 0)
-            .animation(.spring(response: 0.3, dampingFraction: 0.4), value: quoteShakeError)
         }
+        .buttonStyle(BlueprintPrimaryCapsuleButtonStyle(isEnabled: canContinue))
+        .offset(x: quoteShakeError ? -8 : 0)
+        .animation(.spring(response: 0.3, dampingFraction: 0.4), value: quoteShakeError)
         .animation(.spring(response: 0.4, dampingFraction: 0.7), value: canContinue)
     }
 
@@ -409,20 +385,12 @@ struct EmotionEaseView: View {
                         showQuoteSheet = false
                     } label: {
                         Text("Add to Board")
-                            .font(.system(size: 17, weight: .semibold, design: .rounded))
-                            .foregroundStyle(.white)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 16)
-                            .background(
-                                LinearGradient(
-                                    colors: [Color(hue: 0.72, saturation: 0.55, brightness: 0.72),
-                                             Color(hue: 0.58, saturation: 0.45, brightness: 0.78)],
-                                    startPoint: .leading,
-                                    endPoint: .trailing
-                                )
-                            )
-                            .clipShape(RoundedRectangle(cornerRadius: 14))
                     }
+                    .buttonStyle(
+                        BlueprintPrimaryCapsuleButtonStyle(
+                            isEnabled: !quoteText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                        )
+                    )
                     .disabled(quoteText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                     .opacity(quoteText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? 0.5 : 1)
                     .padding(.bottom, 20)
@@ -496,5 +464,5 @@ struct TileButtonStyle: ButtonStyle {
 // MARK: - Preview
 
 #Preview {
-    EmotionEaseView()
+    EmotionEaseView(currentStep: .constant(.moodboard))
 }

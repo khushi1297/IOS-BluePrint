@@ -11,9 +11,14 @@ private enum TasksFigmaLayout {
     static let continueBottomFromScreen: CGFloat = 97
     /// Reference inset above the home-indicator safe area (97 − 34).
     static let continueBottomAboveSafeArea: CGFloat = 63
+    /// Tasks sit in a column above the hub nav; nudge the pill slightly lower without crowding the bar.
+    static let continueBottomNudgeDown: CGFloat = 10
+    /// Minimum space from the layout bottom (top of nav stack) to the pill’s baseline — keeps the CTA off the nav chrome.
+    static let continueBottomMinClearance: CGFloat = 12
 
     static func continueBottomPadding(safeAreaBottom: CGFloat) -> CGFloat {
-        max(continueBottomAboveSafeArea, continueBottomFromScreen - safeAreaBottom)
+        let baseline = max(continueBottomAboveSafeArea, continueBottomFromScreen - safeAreaBottom)
+        return max(continueBottomMinClearance, baseline - continueBottomNudgeDown)
     }
 
     /// Scroll tail so task rows clear the CTA (helper sits in the band below the button).

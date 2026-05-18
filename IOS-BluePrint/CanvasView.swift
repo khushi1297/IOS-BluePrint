@@ -15,151 +15,133 @@ struct CanvasView: View {
     @Binding var currentStep: AppStep
     @ObservedObject var blueprint: BlueprintState
 
+    @AppStorage("hasSeenCanvasWelcome") private var hasSeenCanvasWelcome = false
+    @State private var showWelcomeOverlay = false
     @State private var showMoodOverlay = false
     @State private var pendingMood: CanvasMood?
     @State private var userSkippedMoodPrompt = false
 
+    private let userName = "Jaju"
+
     let leftCategories = [
         GoalCategory(title: "Relationships", completed: 1, total: 5, color: Color(hue: 0.75, saturation: 0.3, brightness: 0.9), height: 140),
-        GoalCategory(title: "Health &\nEnergy", completed: 3, total: 6, color: Color(hue: 0.52, saturation: 0.3, brightness: 0.95), height: 180),
+        GoalCategory(title: "Health & Energy", completed: 3, total: 6, color: Color(hue: 0.52, saturation: 0.3, brightness: 0.95), height: 180),
     ]
 
     let rightCategories = [
-        GoalCategory(title: "Freedom &\nFlexibility", completed: 3, total: 5, color: Color(hue: 0.95, saturation: 0.3, brightness: 0.98), height: 180),
-        GoalCategory(title: "Growth &\nLearning", completed: 2, total: 5, color: Color(hue: 0.12, saturation: 0.5, brightness: 0.98), height: 140),
+        GoalCategory(title: "Freedom & Flexibility", completed: 3, total: 5, color: Color(hue: 0.95, saturation: 0.3, brightness: 0.98), height: 180),
+        GoalCategory(title: "Growth & Learning", completed: 2, total: 5, color: Color(hue: 0.12, saturation: 0.5, brightness: 0.98), height: 140),
     ]
 
     var body: some View {
-        ZStack {
-            Color(hue: 0.08, saturation: 0.05, brightness: 0.98)
-                .ignoresSafeArea()
+        GeometryReader { geo in
+            let scrollTail = HubChromeMetrics.canvasScrollBottomInset(
+                safeAreaBottom: geo.safeAreaInsets.bottom
+            )
 
-            VStack(alignment: .leading, spacing: 0) {
-                ZStack(alignment: .topTrailing) {
-                    VStack(alignment: .center, spacing: 8) {
-                        Text("Your Canvas")
-                            .font(.system(size: 32, weight: .bold, design: .rounded))
-                            .foregroundStyle(Color(hue: 0.12, saturation: 0.6, brightness: 0.98))
+            ZStack {
+                Color(hue: 0.08, saturation: 0.05, brightness: 0.98)
+                    .ignoresSafeArea()
 
-                        Text("Good morning, Jaju")
-                            .font(.system(size: 18, weight: .regular, design: .rounded))
-                            .foregroundStyle(.secondary)
-                    }
-                    .frame(maxWidth: .infinity)
-
-                    if let mood = blueprint.selectedMood {
-                        HStack(spacing: 6) {
-                            Text(mood.emoji)
-                                .font(.system(size: 16))
-                            Text(mood.title)
-                                .font(.system(size: 13, weight: .semibold, design: .rounded))
-                                .foregroundStyle(.black.opacity(0.65))
+                VStack(alignment: .leading, spacing: 0) {
+                    VStack(spacing: 10) {
+                        if let mood = blueprint.selectedMood {
+                            HStack {
+                                Spacer(minLength: 0)
+                                canvasMoodChip(mood: mood)
+                            }
+                            .padding(.horizontal, 24)
                         }
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 8)
-                        .background(mood.chipBackground)
-                        .clipShape(Capsule())
-                        .overlay(
-                            Capsule()
-                                .strokeBorder(Color.white.opacity(0.65), lineWidth: 0.5)
-                        )
-                        .padding(.trailing, 8)
+
+                        VStack(alignment: .center, spacing: 8) {
+                            Text("Your Canvas")
+                                .font(.system(size: 32, weight: .bold, design: .rounded))
+                                .foregroundStyle(Color(hue: 0.12, saturation: 0.6, brightness: 0.98))
+
+                            Text("Good morning, \(userName)")
+                                .font(.system(size: 18, weight: .regular, design: .rounded))
+                                .foregroundStyle(.secondary)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.trailing, 48)
                     }
-                }
-                .padding(.top, 20)
+                    .padding(.top, max(geo.safeAreaInsets.top, 12) + 8)
 
-                HStack {
-                    HStack(spacing: 6) {
-                        Circle()
-                            .strokeBorder(Color(hue: 0.75, saturation: 0.4, brightness: 0.8), lineWidth: 2)
-                            .frame(width: 12, height: 12)
+                    HStack(alignment: .center) {
+                        CanvasProgressBadge(completed: 7, total: 20)
 
-                        Text("7 of 20 steps")
-                            .font(.system(size: 12, weight: .medium, design: .rounded))
-                            .foregroundStyle(.black.opacity(0.6))
+                        Spacer()
+
+                        Text("Design a life that feels like you")
+                            .font(.system(size: 14, weight: .regular, design: .rounded))
+                            .foregroundStyle(.secondary)
+                            .multilineTextAlignment(.trailing)
                     }
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
-                    .background(Color(hue: 0.75, saturation: 0.2, brightness: 0.9))
-                    .clipShape(Capsule())
+                    .padding(.horizontal, 24)
+                    .padding(.top, 16)
 
-                    Spacer()
+                    ScrollView(.vertical, showsIndicators: false) {
+                        VStack(alignment: .leading, spacing: 16) {
+                            HStack(alignment: .top, spacing: 16) {
+                                VStack(spacing: 16) {
+                                    ForEach(leftCategories) { category in
+                                        CategoryCard(category: category)
+                                            .contentShape(RoundedRectangle(cornerRadius: 16))
+                                            .onTapGesture {
+                                                selectLifeArea(from: category.title)
+                                            }
+                                    }
+                                }
 
-                    Text("Design a life that feels like you")
-                        .font(.system(size: 14, weight: .regular, design: .rounded))
-                        .foregroundStyle(.secondary)
-                }
-                .padding(.horizontal, 24)
-                .padding(.top, 24)
-
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 16) {
-                        HStack(alignment: .top, spacing: 16) {
-                            VStack(spacing: 16) {
-                                ForEach(leftCategories) { category in
-                                    CategoryCard(category: category)
-                                        .contentShape(RoundedRectangle(cornerRadius: 16))
-                                        .onTapGesture {
-                                            selectLifeArea(from: category.title)
-                                        }
+                                VStack(spacing: 16) {
+                                    ForEach(rightCategories) { category in
+                                        CategoryCard(category: category)
+                                            .contentShape(RoundedRectangle(cornerRadius: 16))
+                                            .onTapGesture {
+                                                selectLifeArea(from: category.title)
+                                            }
+                                    }
                                 }
                             }
 
-                            VStack(spacing: 16) {
-                                ForEach(rightCategories) { category in
-                                    CategoryCard(category: category)
-                                        .contentShape(RoundedRectangle(cornerRadius: 16))
-                                        .onTapGesture {
-                                            selectLifeArea(from: category.title)
-                                        }
+                            CategoryCard(category: GoalCategory(title: "Financial Security", completed: 3, total: 6, color: Color(hue: 0.98, saturation: 0.4, brightness: 0.98), height: 120))
+                                .contentShape(RoundedRectangle(cornerRadius: 16))
+                                .onTapGesture {
+                                    selectLifeArea(from: "Financial Security")
                                 }
+
+                            Text("My task for today")
+                                .font(.system(size: 16, weight: .medium, design: .rounded))
+                                .foregroundStyle(.secondary)
+                                .padding(.top, 16)
+
+                            ScrollView(.horizontal, showsIndicators: false) {
+                                HStack(spacing: 14) {
+                                    TaskCard(title: "Book that trip", color: Color(hue: 0.12, saturation: 0.5, brightness: 0.98))
+                                    TaskCard(title: "Join a hiking club", color: Color(hue: 0.98, saturation: 0.3, brightness: 0.95))
+                                    TaskCard(title: "Plan a getaway", color: Color(hue: 0.75, saturation: 0.2, brightness: 0.9))
+                                }
+                                .padding(.vertical, 4)
                             }
+
+                            Color.clear.frame(height: scrollTail)
                         }
-
-                        CategoryCard(category: GoalCategory(title: "Financial Security", completed: 3, total: 6, color: Color(hue: 0.98, saturation: 0.4, brightness: 0.98), height: 120))
-                            .contentShape(RoundedRectangle(cornerRadius: 16))
-                            .onTapGesture {
-                                selectLifeArea(from: "Financial Security")
-                            }
-
-                        Text("My task for today")
-                            .font(.system(size: 16, weight: .medium, design: .rounded))
-                            .foregroundStyle(.secondary)
-                            .padding(.top, 16)
-
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            HStack(spacing: 14) {
-                                TaskCard(title: "Book that trip", color: Color(hue: 0.12, saturation: 0.5, brightness: 0.98))
-                                TaskCard(title: "Join a hiking club", color: Color(hue: 0.98, saturation: 0.3, brightness: 0.95))
-                                TaskCard(title: "Plan a getaway", color: Color(hue: 0.75, saturation: 0.2, brightness: 0.9))
-                            }
-                            .padding(.vertical, 4)
-                        }
-
-                        Color.clear.frame(height: 100)
+                        .padding(24)
+                        .padding(.bottom, 8)
                     }
-                    .padding(24)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
+                .frame(width: geo.size.width, height: geo.size.height, alignment: .top)
 
-                    BlueprintBottomNavBar(currentStep: $currentStep, horizontalInset: 24)
-                        .padding(.bottom, 10)
+                if showWelcomeOverlay {
+                CanvasWelcomeOverlay(userName: userName) {
+                    dismissWelcomeAndStartCanvas()
+                }
+                .transition(.opacity.combined(with: .scale(scale: 0.96, anchor: .center)))
+                .zIndex(60_000)
             }
 
-            VStack {
-                Spacer()
-                Button {
-                    withAnimation {
-                        currentStep = .gap
-                    }
-                } label: {
-                    Text("Continue")
-                }
-                .buttonStyle(BlueprintPrimaryCapsuleButtonStyle())
-                .padding(.horizontal, 60)
-                .padding(.bottom, 90)
-            }
-
-            if showMoodOverlay {
+            if showMoodOverlay, !showWelcomeOverlay {
                 MoodCheckInOverlay(
                     pendingMood: $pendingMood,
                     onClose: {
@@ -180,14 +162,46 @@ struct CanvasView: View {
                 )
                 .transition(.opacity.combined(with: .scale(scale: 0.96, anchor: .center)))
                 .zIndex(50_000)
+                }
             }
         }
         .onAppear {
-            guard blueprint.selectedMood == nil, !userSkippedMoodPrompt else { return }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
-                withAnimation(.spring(response: 0.5, dampingFraction: 0.86)) {
-                    showMoodOverlay = true
-                }
+            presentWelcomeOrMoodCheckIn()
+        }
+    }
+
+    private func presentWelcomeOrMoodCheckIn() {
+        showMoodOverlay = false
+
+        if blueprint.shouldPresentCanvasWelcome || !hasSeenCanvasWelcome {
+            blueprint.shouldPresentCanvasWelcome = false
+            withAnimation(.spring(response: 0.5, dampingFraction: 0.86)) {
+                showWelcomeOverlay = true
+            }
+            return
+        }
+
+        scheduleMoodCheckInIfNeeded()
+    }
+
+    private func dismissWelcomeAndStartCanvas() {
+        hasSeenCanvasWelcome = true
+        withAnimation(.spring(response: 0.45, dampingFraction: 0.88)) {
+            showWelcomeOverlay = false
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            scheduleMoodCheckInIfNeeded()
+        }
+    }
+
+    private func scheduleMoodCheckInIfNeeded() {
+        guard !showWelcomeOverlay else { return }
+        guard blueprint.selectedMood == nil, !userSkippedMoodPrompt else { return }
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+            guard !showWelcomeOverlay, blueprint.selectedMood == nil, !userSkippedMoodPrompt else { return }
+            withAnimation(.spring(response: 0.5, dampingFraction: 0.86)) {
+                showMoodOverlay = true
             }
         }
     }
@@ -199,6 +213,24 @@ struct CanvasView: View {
         withAnimation {
             currentStep = .gap
         }
+    }
+
+    /// Compact mood pill — smaller than Tasks/Gap so it does not cover the title.
+    private func canvasMoodChip(mood: CanvasMood) -> some View {
+        HStack(spacing: 4) {
+            MoodAssetIcon(mood: mood, height: 14, maxWidth: 38)
+            Text(mood.title)
+                .font(.system(size: 10, weight: .semibold, design: .rounded))
+                .foregroundStyle(.black.opacity(0.65))
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .background(mood.chipBackground)
+        .clipShape(Capsule())
+        .overlay(
+            Capsule()
+                .strokeBorder(Color.white.opacity(0.65), lineWidth: 0.5)
+        )
     }
 }
 
@@ -212,8 +244,11 @@ struct CategoryCard: View {
 
             VStack(alignment: .leading, spacing: 0) {
                 Text(category.title)
-                    .font(.system(size: 22, weight: .bold, design: .rounded))
+                    .font(CanvasTypography.lifeAreaTitle())
                     .foregroundStyle(.black)
+                    .multilineTextAlignment(.leading)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .topLeading)
                     .padding(.top, 16)
                     .padding(.horizontal, 16)
 
@@ -234,6 +269,14 @@ struct CategoryCard: View {
                 .padding(.horizontal, 16)
                 .padding(.bottom, 16)
             }
+
+            Image(systemName: "chevron.right")
+                .font(.system(size: 16, weight: .bold))
+                .foregroundStyle(.white)
+                .shadow(color: .black.opacity(0.12), radius: 0, x: 0, y: 1)
+                .padding(.trailing, 14)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .trailing)
+                .accessibilityHidden(true)
         }
         .frame(maxWidth: .infinity, minHeight: category.height)
     }

@@ -13,24 +13,12 @@ struct LandingView: View {
                 VStack(spacing: -8) {
                     Text("BLUE")
                         .font(.system(size: 64, weight: .black, design: .rounded))
-                        .foregroundStyle(
-                            LinearGradient(
-                                colors: [Color(hue: 0.6, saturation: 0.4, brightness: 0.9), Color(hue: 0.75, saturation: 0.4, brightness: 0.8)],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
+                        .foregroundStyle(Color(hue: 0.68, saturation: 0.42, brightness: 0.86))
                         .shadow(color: Color(hue: 0.6, saturation: 0.4, brightness: 0.8).opacity(0.3), radius: 2, x: 2, y: 2)
                     
                     Text("PRINT")
                         .font(.system(size: 64, weight: .black, design: .rounded))
-                        .foregroundStyle(
-                            LinearGradient(
-                                colors: [Color(hue: 0.6, saturation: 0.4, brightness: 0.9), Color(hue: 0.75, saturation: 0.4, brightness: 0.8)],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
+                        .foregroundStyle(Color(hue: 0.68, saturation: 0.42, brightness: 0.86))
                         .shadow(color: Color(hue: 0.6, saturation: 0.4, brightness: 0.8).opacity(0.3), radius: 2, x: 2, y: 2)
                 }
                 .scaleEffect(appear ? 1 : 0.9)

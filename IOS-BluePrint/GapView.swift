@@ -20,7 +20,6 @@ private extension Color {
     static let gapPurple = Color(hex: 0xCDB7FA)
     static let gapBlue = Color(hex: 0x8CD7E6)
     static let gapChipBorder = Color(hex: 0xCDB6E2)
-    static let gapTabBarFill = Color(hex: 0x3A3A3A).opacity(0.92)
 }
 
 struct GapView: View {
@@ -38,15 +37,8 @@ struct GapView: View {
         blueprint.selectedMood?.title ?? "Set mood"
     }
 
-    private var moodEmoji: String {
-        blueprint.selectedMood?.emoji ?? "😐"
-    }
-
     var body: some View {
-        ZStack(alignment: .bottom) {
-            Color.gapCanvas
-                .ignoresSafeArea()
-
+        HubScreenLayout(background: Color.gapCanvas) {
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
                     header
@@ -64,18 +56,12 @@ struct GapView: View {
 
                     blockingSection
                         .padding(.top, 22)
-                        .padding(.bottom, 160)
+                        .padding(.bottom, HubChromeMetrics.scrollTailPadding)
                 }
                 .padding(.horizontal, 20)
             }
-
-            VStack(spacing: 10) {
-                continueButton
-                tabBar
-            }
-            .padding(.horizontal, 20)
-            .padding(.bottom, 10)
-            .background(Color.gapCanvas)
+        } footer: {
+            continueButton
         }
         .onAppear {
             startPuzzleAnimation()
@@ -88,34 +74,45 @@ struct GapView: View {
     private var header: some View {
         HStack(alignment: .center, spacing: 8) {
             Button {
-                withAnimation {
-                    currentStep = .canvas
-                }
+                $currentStep.navigate(to: .canvas)
             } label: {
                 Image(systemName: "chevron.left")
                     .font(.system(size: 17, weight: .semibold, design: .rounded))
                     .foregroundStyle(Color(hex: 0x747474))
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            .accessibilityLabel("Back to Canvas")
 
-            chipPill(text: lifeAreaLabel)
-                .lineLimit(1)
-                .layoutPriority(-1)
+            Button {
+                $currentStep.navigate(to: .canvas)
+            } label: {
+                chipPill(text: lifeAreaLabel)
+                    .lineLimit(1)
+            }
+            .buttonStyle(.plain)
+            .layoutPriority(-1)
+            .accessibilityLabel("Life area, go to Canvas")
 
             Spacer(minLength: 8)
 
             moodChip
                 .layoutPriority(1)
+                .accessibilityLabel(moodLabel)
+                .accessibilityAddTraits(.isStaticText)
         }
     }
 
+    /// Read-only mood from Canvas check-in (not editable on Gap).
     private var moodChip: some View {
         HStack(spacing: 6) {
-            Text(moodEmoji)
-                .font(.system(size: 14))
+            if let mood = blueprint.selectedMood {
+                MoodAssetIcon(mood: mood, height: 20, maxWidth: 58)
+            }
             Text(moodLabel)
                 .font(.system(size: 12, weight: .semibold, design: .rounded))
-                .foregroundStyle(Color.gapTextPrimary)
+                .foregroundStyle(Color.gapTextPrimary.opacity(blueprint.selectedMood == nil ? 0.55 : 1))
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 6)
@@ -125,6 +122,7 @@ struct GapView: View {
                 .strokeBorder(Color.gapChipBorder.opacity(0.9), lineWidth: 0.5)
         )
         .clipShape(Capsule())
+        .allowsHitTesting(false)
     }
 
     private func chipPill(text: String) -> some View {
@@ -254,7 +252,7 @@ struct GapView: View {
                         blueprint.selectedGap = blocker
                     }
                 } label: {
-                    HStack(alignment: .top, spacing: 10) {
+                    HStack(alignment: .center, spacing: 10) {
                         Text("\(index + 1).")
                             .font(.system(size: 14, weight: .semibold, design: .rounded))
                             .foregroundStyle(Color.gapTextPrimary.opacity(0.7))
@@ -264,6 +262,11 @@ struct GapView: View {
                             .foregroundStyle(Color.gapTextPrimary)
                             .multilineTextAlignment(.leading)
                             .frame(maxWidth: .infinity, alignment: .leading)
+
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 14, weight: .bold))
+                            .foregroundStyle(.white)
+                            .shadow(color: .black.opacity(0.12), radius: 0, x: 0, y: 1)
                     }
                     .padding(.vertical, 12)
                     .padding(.horizontal, 14)
@@ -278,8 +281,11 @@ struct GapView: View {
                                 lineWidth: selected ? 1.5 : 0.35
                             )
                     )
+                    .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel(blocker.listTitle)
+                .accessibilityAddTraits(selected ? .isSelected : [])
                 .opacity(visible ? 1 : 0)
                 .offset(y: visible ? 0 : 16)
             }
@@ -290,58 +296,13 @@ struct GapView: View {
 
     private var continueButton: some View {
         Button {
-            withAnimation {
-                currentStep = .tasks
-            }
+            $currentStep.navigate(to: .afterGapContinue)
         } label: {
             Text("Continue")
         }
         .buttonStyle(BlueprintPrimaryCapsuleButtonStyle(isEnabled: blueprint.selectedGap != nil))
         .disabled(blueprint.selectedGap == nil)
         .opacity(blueprint.selectedGap == nil ? 0.5 : 1)
-    }
-
-    private var tabBar: some View {
-        HStack {
-            Spacer()
-            tabBarIcon("house.fill")
-            Spacer()
-            tabBarIcon("doc.on.doc.fill")
-            Spacer()
-            tabBarIcon("star.fill")
-            Spacer()
-        }
-        .padding(.vertical, 14)
-        .background(
-            ZStack {
-                Capsule()
-                    .fill(.ultraThinMaterial)
-                Capsule()
-                    .fill(Color.gapTabBarFill.opacity(0.88))
-            }
-        )
-        .clipShape(Capsule())
-        .overlay(
-            Capsule()
-                .strokeBorder(Color.white.opacity(0.12), lineWidth: 0.5)
-        )
-        .shadow(color: .black.opacity(0.2), radius: 12, y: 4)
-    }
-
-    private func tabBarIcon(_ name: String) -> some View {
-        Image(systemName: name)
-            .font(.system(size: 22, weight: .medium))
-            .foregroundStyle(
-                LinearGradient(
-                    colors: [
-                        Color.gapPurple.opacity(0.98),
-                        Color.gapBlue.opacity(0.98),
-                    ],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-            )
-            .shadow(color: .black.opacity(0.55), radius: 0, x: 0, y: 1)
     }
 
     // MARK: Animations

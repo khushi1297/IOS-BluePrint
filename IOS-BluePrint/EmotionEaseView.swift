@@ -175,15 +175,9 @@ struct EmotionEaseView: View {
 
                     Capsule()
                         .fill(
-                            LinearGradient(
-                                colors: canContinue
-                                    ? [Color(hue: 0.38, saturation: 0.6, brightness: 0.7),
-                                       Color(hue: 0.45, saturation: 0.5, brightness: 0.65)]
-                                    : [Color(hue: 0.72, saturation: 0.55, brightness: 0.72),
-                                       Color(hue: 0.58, saturation: 0.40, brightness: 0.78)],
-                                startPoint: .leading,
-                                endPoint: .trailing
-                            )
+                            canContinue
+                                ? Color(hue: 0.42, saturation: 0.55, brightness: 0.68)
+                                : Color(hue: 0.65, saturation: 0.48, brightness: 0.75)
                         )
                         .frame(
                             width: max(0, geo.size.width * CGFloat(filledCount) / CGFloat(tiles.count)),

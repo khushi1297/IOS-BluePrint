@@ -42,7 +42,7 @@ struct TaskPageContent: Equatable {
         case .permanentlyLocked:
             return true
         case .lockedUntilActiveComplete(let threshold), .bonusUntilActiveComplete(let threshold):
-            return activeCompletedCount(completedIDs: completedIDs) < threshold
+            return unlockCompletionCount(completedIDs: completedIDs) < threshold
         }
     }
 
@@ -65,6 +65,14 @@ struct TaskPageContent: Equatable {
             .filter(\.role.countsTowardRequired)
             .filter { completedIDs.contains($0.id) }
             .count
+    }
+
+    /// Completed tasks that count toward progressive unlocks (active + unlocked steps).
+    private func unlockCompletionCount(completedIDs: Set<UUID>) -> Int {
+        tasks.filter { task in
+            if case .permanentlyLocked = task.role { return false }
+            return completedIDs.contains(task.id)
+        }.count
     }
 }
 
@@ -122,58 +130,129 @@ enum DailyTaskGenerator {
 
         switch mood {
         case .good:
-            return goodTasks(from: pool, generationKey: generationKey)
+            return goodReferenceTasks(generationKey: generationKey)
         case .normal:
-            return [
-                task(at: 0, role: .active, lockedSubtitle: ""),
-                task(at: 1, role: .active, lockedSubtitle: ""),
-                task(at: 2, role: .active, lockedSubtitle: ""),
-                task(at: 3, role: .lockedUntilActiveComplete(unlockAfter: 3), lockedSubtitle: "Unlocks after your first three wins"),
-                task(at: 4, role: .permanentlyLocked, lockedSubtitle: "Saved for better energy days"),
-            ]
+            return normalReferenceTasks(generationKey: generationKey)
         case .low:
-            return [
-                task(at: 0, role: .active, lockedSubtitle: ""),
-                task(at: 1, role: .active, lockedSubtitle: ""),
-                task(at: 2, role: .optional, lockedSubtitle: ""),
-                task(at: 3, role: .permanentlyLocked, lockedSubtitle: "Saved for when you have more in the tank"),
-                task(at: 4, role: .permanentlyLocked, lockedSubtitle: "Bigger step — not required today"),
-            ]
+            return lowReferenceTasks(generationKey: generationKey)
         case .rough:
             return roughReferenceTasks(generationKey: generationKey)
         }
     }
 
-    /// Good prototype: 3 active micro-actions + next step + bonus (unlock after 3 wins).
-    private static func goodTasks(from pool: [TaskPair], generationKey: String) -> [DailyTask] {
-        func active(at index: Int) -> DailyTask {
-            let pair = pool[min(index, pool.count - 1)]
-            return DailyTask(
+    /// Normal mood screen — fixed prototype copy (3 active + 2 progressive unlocks).
+    private static func normalReferenceTasks(generationKey: String) -> [DailyTask] {
+        func row(
+            _ index: Int,
+            title: String,
+            subtitle: String,
+            role: DailyTaskRole,
+            lockedSubtitle: String = ""
+        ) -> DailyTask {
+            DailyTask(
                 id: TaskIdentity.id(generationKey: generationKey, index: index),
-                title: pair.title,
-                subtitle: pair.subtitle,
-                lockedSubtitle: "",
-                role: .active
+                title: title,
+                subtitle: subtitle,
+                lockedSubtitle: lockedSubtitle,
+                role: role
             )
         }
 
         return [
-            active(at: 0),
-            active(at: 1),
-            active(at: 2),
+            row(0, title: "Choose one recipe to cook", subtitle: "Focus on making the food taste good", role: .active),
+            row(1, title: "Spend 10 mins on meditation", subtitle: "Take slow breaths", role: .active),
+            row(2, title: "Remove one small blocker", subtitle: "Make tomorrow easier", role: .active),
+            row(
+                3,
+                title: "Plan the next step",
+                subtitle: "Map one small move for tomorrow",
+                role: .lockedUntilActiveComplete(unlockAfter: 3),
+                lockedSubtitle: "Unlocks after 3 tasks"
+            ),
+            row(
+                4,
+                title: "Book the Perth trip",
+                subtitle: "Lock in dates when you're ready",
+                role: .lockedUntilActiveComplete(unlockAfter: 4),
+                lockedSubtitle: "Unlocks after 4 tasks"
+            ),
+        ]
+    }
+
+    /// Good mood screen — fixed prototype copy (3 active + 2 unlock after 3 wins).
+    private static func goodReferenceTasks(generationKey: String) -> [DailyTask] {
+        func row(
+            _ index: Int,
+            title: String,
+            subtitle: String,
+            role: DailyTaskRole,
+            lockedSubtitle: String = ""
+        ) -> DailyTask {
             DailyTask(
-                id: TaskIdentity.id(generationKey: generationKey, index: 3),
+                id: TaskIdentity.id(generationKey: generationKey, index: index),
+                title: title,
+                subtitle: subtitle,
+                lockedSubtitle: lockedSubtitle,
+                role: role
+            )
+        }
+
+        return [
+            row(0, title: "Start a pottery workshop", subtitle: "Pick the thing that moves you forward", role: .active),
+            row(1, title: "Spend 30 mins in the library", subtitle: "Use your energy with focus", role: .active),
+            row(2, title: "Do one brave follow-up", subtitle: "Message, book, apply, ask or decide", role: .active),
+            row(
+                3,
                 title: "Set up your next step",
                 subtitle: "Make future-you's life easier",
-                lockedSubtitle: "Unlocks after your first three wins",
-                role: .lockedUntilActiveComplete(unlockAfter: 3)
+                role: .lockedUntilActiveComplete(unlockAfter: 3),
+                lockedSubtitle: "Make future-you's life easier"
             ),
-            DailyTask(
-                id: TaskIdentity.id(generationKey: generationKey, index: 4),
+            row(
+                4,
                 title: "Bonus stretch goal",
                 subtitle: "Pick the thing that moves you forward",
-                lockedSubtitle: "Saved for better energy days",
-                role: .bonusUntilActiveComplete(unlockAfter: 3)
+                role: .bonusUntilActiveComplete(unlockAfter: 3),
+                lockedSubtitle: "Saved for better energy days"
+            ),
+        ]
+    }
+
+    /// Low mood screen — fixed prototype copy (3 active + 2 locked).
+    private static func lowReferenceTasks(generationKey: String) -> [DailyTask] {
+        func row(
+            _ index: Int,
+            title: String,
+            subtitle: String,
+            role: DailyTaskRole,
+            lockedSubtitle: String = ""
+        ) -> DailyTask {
+            DailyTask(
+                id: TaskIdentity.id(generationKey: generationKey, index: index),
+                title: title,
+                subtitle: subtitle,
+                lockedSubtitle: lockedSubtitle,
+                role: role
+            )
+        }
+
+        return [
+            row(0, title: "Name what feels heavy", subtitle: "Write one sentence about what is in your mind", role: .active),
+            row(1, title: "Do a 5-minute reset", subtitle: "Stretch, breathe, sit outside, drink water", role: .active),
+            row(2, title: "Choose one easy next step", subtitle: "Deep-research work session", role: .active),
+            row(
+                3,
+                title: "Plan a freedom block",
+                subtitle: "",
+                role: .permanentlyLocked,
+                lockedSubtitle: "Create a 1-hour space for the work"
+            ),
+            row(
+                4,
+                title: "Work on big goal (2hrs)",
+                subtitle: "",
+                role: .permanentlyLocked,
+                lockedSubtitle: "Saved for better energy days"
             ),
         ]
     }
@@ -219,10 +298,8 @@ enum DailyTaskGenerator {
 
     private static func moodAdjustedSubtitle(_ base: String, mood: Mood) -> String {
         switch mood {
-        case .good, .normal, .rough:
+        case .good, .normal, .rough, .low:
             return base
-        case .low:
-            return "Small win — \(base)"
         }
     }
 

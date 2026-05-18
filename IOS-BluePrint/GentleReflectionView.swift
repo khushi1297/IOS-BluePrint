@@ -22,7 +22,8 @@ struct GentleReflectionView: View {
             GeometryReader { geo in
                 let safe = geo.safeAreaInsets
                 let inset: CGFloat = 24
-
+                let scrollTail = HubChromeMetrics.bottomNavReservedHeight(safeAreaBottom: safe.bottom)
+                    + HubChromeMetrics.scrollTailPadding
                 VStack(spacing: 0) {
                     Text("Gentle Reflection")
                         .font(.system(size: 30, weight: .bold, design: .rounded))
@@ -37,16 +38,16 @@ struct GentleReflectionView: View {
                             connectionCard
                             streakCard
                             mantraCard
+
+                            Color.clear
+                                .frame(height: scrollTail)
                         }
                         .padding(.horizontal, inset)
                         .padding(.top, 4)
-                        .padding(.bottom, 20)
                         .frame(maxWidth: .infinity)
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-                    BlueprintBottomNavBar(currentStep: $currentStep, horizontalInset: inset, style: .dark)
-                        .padding(.bottom, max(safe.bottom, 16))
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             }
@@ -61,24 +62,14 @@ struct GentleReflectionView: View {
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: .infinity)
 
-            VStack(spacing: 12) {
-                FortuneCookieLineArt()
-                    .frame(height: 118)
-                    .accessibilityLabel("Fortune cookie")
-
-                Text("YOU WILL HAVE A GREAT DAY ☺︎")
-                    .font(.system(size: 12, weight: .bold, design: .rounded))
-                    .foregroundStyle(Color(hue: 0.72, saturation: 0.45, brightness: 0.45))
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 8)
-                    .background(Color.white.opacity(0.85))
-                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 8, style: .continuous)
-                            .strokeBorder(Color.black.opacity(0.12), lineWidth: 1)
-                    )
-            }
-            .padding(.vertical, 8)
+            Image("great_day_illustration")
+                .resizable()
+                .renderingMode(.original)
+                .scaledToFit()
+                .frame(height: 118)
+                .frame(maxWidth: .infinity)
+                .accessibilityLabel("You will have a great day")
+                .padding(.vertical, 8)
         }
         .padding(22)
         .frame(maxWidth: .infinity)
@@ -148,75 +139,6 @@ struct GentleReflectionView: View {
         .frame(maxWidth: .infinity)
         .background(cardLavender)
         .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-    }
-}
-
-/// Purple line-art style fortune cookie character (reference illustration).
-private struct FortuneCookieLineArt: View {
-    private let stroke = Color(hue: 0.72, saturation: 0.5, brightness: 0.48)
-
-    var body: some View {
-        ZStack {
-            // Folded cookie body
-            ZStack {
-                Capsule()
-                    .stroke(stroke, lineWidth: 2.5)
-                    .frame(width: 92, height: 44)
-                    .rotationEffect(.degrees(-18))
-                Capsule()
-                    .stroke(stroke, lineWidth: 2.5)
-                    .frame(width: 88, height: 42)
-                    .rotationEffect(.degrees(14))
-                    .offset(x: 4, y: 6)
-            }
-            .offset(y: -8)
-
-            // Face
-            HStack(spacing: 14) {
-                Circle().fill(stroke).frame(width: 5, height: 5)
-                Circle().fill(stroke).frame(width: 5, height: 5)
-            }
-            .offset(y: 2)
-
-            SmileArc()
-                .stroke(stroke, style: StrokeStyle(lineWidth: 2, lineCap: .round))
-                .frame(width: 22, height: 12)
-                .offset(y: 10)
-
-            // Stick legs
-            HStack(spacing: 18) {
-                LegLine()
-                LegLine()
-            }
-            .offset(y: 36)
-        }
-        .frame(maxWidth: .infinity)
-    }
-
-    private struct LegLine: View {
-        private let stroke = Color(hue: 0.72, saturation: 0.5, brightness: 0.48)
-        var body: some View {
-            Path { p in
-                p.move(to: CGPoint(x: 0, y: 0))
-                p.addLine(to: CGPoint(x: 2, y: 14))
-            }
-            .stroke(stroke, style: StrokeStyle(lineWidth: 2.2, lineCap: .round))
-            .frame(width: 4, height: 14)
-        }
-    }
-
-    private struct SmileArc: Shape {
-        func path(in rect: CGRect) -> Path {
-            var p = Path()
-            p.addArc(
-                center: CGPoint(x: rect.midX, y: rect.minY),
-                radius: rect.width / 2,
-                startAngle: .degrees(12),
-                endAngle: .degrees(168),
-                clockwise: false
-            )
-            return p
-        }
     }
 }
 

@@ -107,10 +107,7 @@ struct QuestionsView: View {
                     .buttonStyle(BlueprintPrimaryCapsuleButtonStyle())
                     .padding(.horizontal, horizontalInset)
                     .padding(.top, 2)
-                    .padding(.bottom, 6)
-
-                    BlueprintBottomNavBar(currentStep: $currentStep, horizontalInset: horizontalInset)
-                        .padding(.bottom, max(safe.bottom, 10))
+                    .padding(.bottom, max(safe.bottom, 10))
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             }

@@ -22,6 +22,7 @@ private let maxPriorityCardCount = 6
 
 struct PrioritiesView: View {
     @Binding var currentStep: AppStep
+    @ObservedObject var blueprint: BlueprintState
 
     @State private var items: [PriorityItem] = [
         PriorityItem(title: "Financial Security", subtitle1: "Save for my next trip", subtitle2: "Review monthly spending", subtitle3: "Set up an emergency buffer", color: Color(red: 1.0, green: 0.64, blue: 0.65), rotation: 7.0),
@@ -239,14 +240,13 @@ struct PrioritiesView: View {
                     // Footer (nudged up so Continue overlaps the bottom of the stack, like the reference)
                     VStack(spacing: 12) {
                         Button {
+                            blueprint.shouldPresentCanvasWelcome = true
                             withAnimation { currentStep = .canvas }
                         } label: {
                             Text("Continue")
                         }
                         .buttonStyle(BlueprintPrimaryCapsuleButtonStyle())
                         .padding(.horizontal, horizontalInset)
-
-                        BlueprintBottomNavBar(currentStep: $currentStep, horizontalInset: horizontalInset)
                     }
                     .padding(.top, 12) // footer
                     .padding(.bottom, max(safe.bottom, 10))
@@ -321,20 +321,14 @@ struct PriorityStackCard: View {
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
 
-                    HStack(spacing: 6) {
-                        Text("#\(priority) Priority")
-                            .font(.system(size: 11 * (cardWidth / 330), weight: .bold, design: .rounded))
-                            .foregroundStyle(.black.opacity(0.5))
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 5)
-                            .background(Color.white.opacity(0.39))
-                            .clipShape(RoundedRectangle(cornerRadius: 8))
-
-                        Image(systemName: "chevron.right")
-                            .font(.system(size: 14 * (cardWidth / 330), weight: .bold))
-                            .foregroundStyle(.white)
-                    }
-                    .fixedSize(horizontal: true, vertical: false)
+                    Text("#\(priority) Priority")
+                        .font(.system(size: 11 * (cardWidth / 330), weight: .bold, design: .rounded))
+                        .foregroundStyle(.black.opacity(0.5))
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 5)
+                        .background(Color.white.opacity(0.39))
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                        .fixedSize(horizontal: true, vertical: false)
                 }
                 .padding(.horizontal, 16)
                 .padding(.bottom, 14)
@@ -345,5 +339,5 @@ struct PriorityStackCard: View {
 }
 
 #Preview {
-    PrioritiesView(currentStep: .constant(.priorities))
+    PrioritiesView(currentStep: .constant(.priorities), blueprint: BlueprintState())
 }

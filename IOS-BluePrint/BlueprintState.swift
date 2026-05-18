@@ -38,6 +38,26 @@ enum CanvasMood: String, CaseIterable, Identifiable {
         }
     }
 
+    /// Asset catalog image for the mood check-in picker (includes pill background).
+    var pickerImageName: String {
+        switch self {
+        case .good: "mood_good"
+        case .normal: "mood_normal"
+        case .low: "mood_low"
+        case .rough: "mood_rough"
+        }
+    }
+
+    /// “Completed today” card on the tiny-win screen (between subtitle and progress text).
+    var tinyWinCardAsset: String {
+        switch self {
+        case .rough: "card_red"
+        case .low: "card_purple"
+        case .normal: "card_blue"
+        case .good: "card_yellow"
+        }
+    }
+
     var pickerTint: Color {
         switch self {
         case .good:
@@ -69,8 +89,8 @@ enum CanvasMood: String, CaseIterable, Identifiable {
     var tasksTagline: String {
         switch self {
         case .rough: "Rough days count too. Be easy on yourself"
-        case .low: "Small steps still move you forward"
-        case .normal: "Steady is enough today"
+        case .low: "Make it gentle, step by step."
+        case .normal: "Let's keep it steady, with a smile"
         case .good: "You have energy today. Let's rock it"
         }
     }
@@ -78,9 +98,9 @@ enum CanvasMood: String, CaseIterable, Identifiable {
     var tasksChipBackground: Color {
         switch self {
         case .rough:
-            Color(red: 1.0, green: 0.82, blue: 0.84) // #FFD1D5
+            Color(red: 1.0, green: 0.82, blue: 0.835) // #FFD1D5
         case .low:
-            Color(red: 0.92, green: 0.86, blue: 0.98)
+            Color(red: 0.88, green: 0.82, blue: 0.97)
         case .normal:
             Color(red: 0.85, green: 0.93, blue: 1.0)
         case .good:
@@ -93,7 +113,7 @@ enum CanvasMood: String, CaseIterable, Identifiable {
         case .rough:
             Color.black.opacity(0.88)
         case .low:
-            Color(red: 0.35, green: 0.22, blue: 0.55)
+            Color(red: 0.30, green: 0.18, blue: 0.45)
         case .normal:
             Color(red: 0.15, green: 0.35, blue: 0.55)
         case .good:
@@ -109,9 +129,9 @@ enum CanvasMood: String, CaseIterable, Identifiable {
         case .normal:
             Color(red: 0.45, green: 0.78, blue: 0.95) // aqua / blue
         case .low:
-            Color(red: 0.72, green: 0.58, blue: 0.95) // lavender / purple
+            Color(red: 0.82, green: 0.74, blue: 0.94) // light lavender
         case .rough:
-            Color(red: 1.0, green: 0.35, blue: 0.37) // coral #FF5A5F
+            Color(red: 1.0, green: 0.42, blue: 0.42) // coral #FF6B6B
         }
     }
 
@@ -120,9 +140,9 @@ enum CanvasMood: String, CaseIterable, Identifiable {
         case .good:
             "Check off the task as you go"
         case .normal:
-            "Check off the task as you go"
+            "Complete 3 tasks to open the next step."
         case .low:
-            "Only one required today — optional tasks are extra"
+            "One or two light tasks are enough today"
         case .rough:
             "Check off the task as you go"
         }
@@ -132,24 +152,23 @@ enum CanvasMood: String, CaseIterable, Identifiable {
     var tasksCTATitle: String {
         switch self {
         case .good: "Continue"
-        case .normal: "Continue to steady win"
-        case .low: "Take a small win"
+        case .normal: "Continue"
+        case .low: "Continue"
         case .rough: "Continue"
         }
     }
 
-    /// Good / Rough task pages hide life-area / gap chips (prototype layout).
+    /// Prototype task pages hide life-area / gap chips.
     var tasksShowsContextChips: Bool {
         switch self {
-        case .good, .rough: false
-        default: true
+        case .good, .normal, .rough, .low: false
         }
     }
 
     var tinyWinHeadline: String {
         switch self {
-        case .good: "Momentum win today."
-        case .normal: "Steady win today."
+        case .good: "Momentum win."
+        case .normal: "Steady win."
         case .low: "Small win today."
         case .rough: "One tiny win today."
         }
@@ -158,13 +177,13 @@ enum CanvasMood: String, CaseIterable, Identifiable {
     var tinyWinBody: String {
         switch self {
         case .good:
-            "You built real momentum. That energy is yours to keep."
+            "You made progress without forcing it."
         case .normal:
-            "You stayed steady today. Consistency is the whole game."
+            "You made progress without forcing it."
         case .low:
-            "You took a small win when it mattered. That counts."
+            "You did a good job."
         case .rough:
-            "You showed up on a rough day. That's the whole thing."
+            "You showed up on a rough day. That counts"
         }
     }
 
@@ -256,6 +275,9 @@ final class BlueprintState: ObservableObject {
     @Published var selectedGap: GapBlocker?
     @Published var completedTaskIDs: Set<UUID> = []
 
+    /// Set when leaving Priorities so Canvas shows "You are all set" before mood check-in.
+    @Published var shouldPresentCanvasWelcome = false
+
     var isReadyForTasks: Bool {
         selectedMood != nil && selectedLifeArea != nil && selectedGap != nil
     }
@@ -277,6 +299,66 @@ final class BlueprintState: ObservableObject {
 
     func isTaskCompleted(_ id: UUID) -> Bool {
         completedTaskIDs.contains(id)
+    }
+
+    /// Called when opening the Tasks tab so the list always renders (prototype defaults).
+    func prepareForTasksIfNeeded() {
+        if selectedMood == nil { selectedMood = .normal }
+        if selectedLifeArea == nil { selectedLifeArea = .freedomFlexibility }
+        if selectedGap == nil { selectedGap = .burnout }
+    }
+}
+
+// MARK: - Canvas welcome (after priorities)
+
+struct CanvasWelcomeOverlay: View {
+    var userName: String
+    let onStart: () -> Void
+
+    private let titleGold = Color(hue: 0.12, saturation: 0.6, brightness: 0.98)
+    private let chipLavender = Color(red: 0.88, green: 0.82, blue: 0.97)
+
+    var body: some View {
+        ZStack {
+            Color.black.opacity(0.38)
+                .ignoresSafeArea()
+
+            VStack(spacing: 0) {
+                Text("You are all set")
+                    .font(.system(size: 28, weight: .bold, design: .serif))
+                    .foregroundStyle(titleGold)
+                    .multilineTextAlignment(.center)
+                    .padding(.top, 36)
+
+                Text("Click to start a new life")
+                    .font(.system(size: 15, weight: .regular, design: .rounded))
+                    .foregroundStyle(Color.black.opacity(0.55))
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 28)
+                    .padding(.top, 12)
+
+                Button(action: onStart) {
+                    Text("Hi \(userName)")
+                        .font(.system(size: 17, weight: .semibold, design: .rounded))
+                        .foregroundStyle(Color.black.opacity(0.82))
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 16)
+                        .background(chipLavender)
+                        .clipShape(Capsule())
+                }
+                .buttonStyle(.plain)
+                .padding(.horizontal, 32)
+                .padding(.top, 28)
+                .padding(.bottom, 36)
+            }
+            .frame(maxWidth: 340)
+            .background(
+                RoundedRectangle(cornerRadius: 28, style: .continuous)
+                    .fill(Color.white)
+            )
+            .shadow(color: .black.opacity(0.16), radius: 28, y: 14)
+            .padding(.horizontal, 32)
+        }
     }
 }
 
@@ -335,8 +417,7 @@ struct MoodCheckInOverlay: View {
                             }
                         } label: {
                             VStack(alignment: .leading, spacing: 8) {
-                                Text(mood.emoji)
-                                    .font(.system(size: 36))
+                                MoodAssetIcon(mood: mood, height: 34, maxWidth: 90)
                                     .frame(maxWidth: .infinity, alignment: .leading)
 
                                 Text(mood.title)

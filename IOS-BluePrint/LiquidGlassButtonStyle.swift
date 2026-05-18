@@ -2,16 +2,9 @@ import SwiftUI
 
 // MARK: - Shared primary CTA (Continue, etc.)
 
-/// One pink gradient, one type size, and one vertical padding for primary capsule actions app-wide.
+/// One pink fill, one type size, and one vertical padding for primary capsule actions app-wide.
 enum BlueprintPrimaryButton {
-    static let gradient = LinearGradient(
-        colors: [
-            Color(red: 0.95, green: 0.45, blue: 0.65),
-            Color(red: 0.98, green: 0.55, blue: 0.75),
-        ],
-        startPoint: .leading,
-        endPoint: .trailing
-    )
+    static let fill = Color(red: 0.96, green: 0.50, blue: 0.70)
 
     static let titleFont: Font = .system(size: 17, weight: .semibold, design: .rounded)
     static let verticalPadding: CGFloat = 16
@@ -19,7 +12,7 @@ enum BlueprintPrimaryButton {
     static let disabledBackground = Color(hue: 0.72, saturation: 0.08, brightness: 0.93)
 }
 
-/// Primary capsule with a hint of frost and specular edge (pink gradient still reads through).
+/// Primary capsule with a hint of frost and specular edge.
 struct BlueprintPrimaryCapsuleButtonStyle: ButtonStyle {
     var isEnabled: Bool = true
 
@@ -33,34 +26,13 @@ struct BlueprintPrimaryCapsuleButtonStyle: ButtonStyle {
                 ZStack {
                     if isEnabled {
                         Capsule()
-                            .fill(BlueprintPrimaryButton.gradient)
+                            .fill(BlueprintPrimaryButton.fill)
                         Capsule()
                             .fill(.ultraThinMaterial)
                         Capsule()
-                            .fill(
-                                LinearGradient(
-                                    stops: [
-                                        .init(color: .white.opacity(configuration.isPressed ? 0.1 : 0.22), location: 0),
-                                        .init(color: .white.opacity(0.06), location: 0.42),
-                                        .init(color: .white.opacity(0), location: 1),
-                                    ],
-                                    startPoint: .top,
-                                    endPoint: .bottom
-                                )
-                            )
+                            .fill(Color.white.opacity(configuration.isPressed ? 0.1 : 0.18))
                         Capsule()
-                            .strokeBorder(
-                                LinearGradient(
-                                    colors: [
-                                        Color.white.opacity(0.48),
-                                        Color.white.opacity(0.16),
-                                        Color.white.opacity(0.3),
-                                    ],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                ),
-                                lineWidth: 1
-                            )
+                            .strokeBorder(Color.white.opacity(0.4), lineWidth: 1)
                     } else {
                         Capsule()
                             .fill(BlueprintPrimaryButton.disabledBackground)
@@ -100,41 +72,14 @@ struct LiquidGlassCapsuleButtonStyle: ButtonStyle {
 
                     if let tint {
                         Capsule()
-                            .fill(
-                                LinearGradient(
-                                    colors: [tint.opacity(0.32), tint.opacity(0.14)],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                )
-                            )
+                            .fill(tint.opacity(0.22))
                     }
 
                     Capsule()
-                        .fill(
-                            LinearGradient(
-                                stops: [
-                                    .init(color: .white.opacity(configuration.isPressed ? 0.12 : 0.38), location: 0),
-                                    .init(color: .white.opacity(0.08), location: 0.42),
-                                    .init(color: .white.opacity(0), location: 1),
-                                ],
-                                startPoint: .top,
-                                endPoint: .bottom
-                            )
-                        )
+                        .fill(Color.white.opacity(configuration.isPressed ? 0.12 : 0.28))
 
                     Capsule()
-                        .strokeBorder(
-                            LinearGradient(
-                                colors: [
-                                    Color.white.opacity(0.72),
-                                    Color.white.opacity(0.22),
-                                    Color.white.opacity(0.45),
-                                ],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            ),
-                            lineWidth: 1.1
-                        )
+                        .strokeBorder(Color.white.opacity(0.45), lineWidth: 1.1)
                 }
                 .compositingGroup()
                 .shadow(color: .black.opacity(0.12), radius: 16, x: 0, y: 10)
@@ -157,26 +102,10 @@ private struct LiquidGlassChipBackground: View {
                 .fill(.ultraThinMaterial)
 
             RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                .fill(
-                    LinearGradient(
-                        colors: [
-                            Color.white.opacity(0.38),
-                            Color.white.opacity(0.06),
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
+                .fill(Color.white.opacity(0.22))
 
             RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                .strokeBorder(
-                    LinearGradient(
-                        colors: [Color.white.opacity(0.55), Color.white.opacity(0.15)],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    ),
-                    lineWidth: 1
-                )
+                .strokeBorder(Color.white.opacity(0.35), lineWidth: 1)
         }
         .compositingGroup()
         .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 6)
